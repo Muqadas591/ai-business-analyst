@@ -1,0 +1,59 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+secrets.toml
+.streamlit/secrets.toml
+
+# Testing and linting
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local datasets and uploaded files
+data/*
+!data/.gitkeep
+uploads/
+storage/
+tmp/
+temp/
+
+# Generated reports and private outputs
+reports/
+artifacts/
+*.pdf
+*.xlsx
+*.xls
+*.csv
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
