@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     max_columns: int = Field(default=200, ge=1, le=2_000)
     temp_file_ttl_minutes: int = Field(default=60, ge=5, le=1_440)
 
+    csv_sample_bytes: int = Field(default=65_536, ge=1_024, le=262_144)
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

@@ -134,3 +134,27 @@ See [LICENSE](LICENSE).
 This project is a software analytics tool, not a substitute for
 professional financial, legal, or operational judgment. AI-generated
 recommendations require review and should be supported by available data.
+
+## Phase 1 — Data Ingestion
+
+The ingestion foundation supports:
+- CSV and XLSX uploads
+- CSV encoding and delimiter handling
+- Explicit Excel worksheet selection
+- File-size, row-count, and column-count limits
+- Typed ingestion results and user-facing errors
+- Synthetic retail data generation
+- Automated unit tests
+- A basic Streamlit upload interface
+
+Run locally:
+
+```powershell
+python -m pip install -e ".[dev]"
+python -m pytest tests/unit -v
+python -m streamlit run app.py
+```
+
+This phase is a development foundation. Authentication, workspace
+isolation, production storage, full security hardening, data-quality
+analysis, and AI recommendations are not yet implemented.
