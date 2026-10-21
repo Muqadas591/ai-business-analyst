@@ -56,9 +56,7 @@ def _validate_headers(columns: list[object], max_columns: int) -> list[str]:
     if not columns or all(
         pd.isna(column) or not str(column).strip() for column in columns
     ):
-        raise MissingHeaderError(
-            "The CSV file has no usable column headers."
-        )
+        raise MissingHeaderError("The CSV file has no usable column headers.")
 
     if len(columns) > max_columns:
         raise ColumnLimitError(
@@ -68,9 +66,7 @@ def _validate_headers(columns: list[object], max_columns: int) -> list[str]:
     normalized = [str(column).strip() for column in columns]
 
     if any(not column for column in normalized):
-        raise MissingHeaderError(
-            "One or more CSV column headers are empty."
-        )
+        raise MissingHeaderError("One or more CSV column headers are empty.")
 
     if len(normalized) != len(set(normalized)):
         raise DuplicateHeaderError(
@@ -139,9 +135,7 @@ def read_csv_bytes(
         and "\r" not in sample
         and len(data) > len(data[: settings.csv_sample_bytes])
     ):
-        raise InvalidFileError(
-            "The CSV header is too long to inspect safely."
-        )
+        raise InvalidFileError("The CSV header is too long to inspect safely.")
 
     # Strict CSV parsing catches unterminated quotes that pandas may tolerate.
     _validate_csv_syntax(data, encoding, delimiter)
@@ -163,21 +157,16 @@ def read_csv_bytes(
 
     if len(dataframe) > settings.max_rows:
         raise RowLimitError(
-            f"The CSV exceeds the configured limit of "
-            f"{settings.max_rows} data rows."
+            f"The CSV exceeds the configured limit of {settings.max_rows} data rows."
         )
 
     if dataframe.empty:
-        raise EmptyDatasetError(
-            "The CSV contains headers but no data rows."
-        )
+        raise EmptyDatasetError("The CSV contains headers but no data rows.")
 
     # Pandas may alter labels; compare against the original header validation.
     parsed_columns = [str(column).strip() for column in dataframe.columns]
     if parsed_columns != columns:
-        raise InvalidFileError(
-            "The CSV header changed unexpectedly during parsing."
-        )
+        raise InvalidFileError("The CSV header changed unexpectedly during parsing.")
 
     dataframe.columns = columns
     return dataframe, encoding, delimiter

@@ -1,4 +1,3 @@
-
 """Tests for application configuration."""
 
 from business_analyst.config import Settings

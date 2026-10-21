@@ -1,4 +1,3 @@
-
 """Public ingestion service for supported tabular uploads."""
 
 from __future__ import annotations

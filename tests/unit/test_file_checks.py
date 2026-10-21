@@ -1,4 +1,3 @@
-
 """Tests for upload checks."""
 
 import pytest

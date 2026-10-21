@@ -35,9 +35,7 @@ def list_excel_sheets(data: bytes) -> list[str]:
         finally:
             workbook.close()
     except Exception as exc:
-        raise InvalidFileError(
-            "The Excel workbook could not be opened."
-        ) from exc
+        raise InvalidFileError("The Excel workbook could not be opened.") from exc
 
 
 def _validate_headers(
@@ -48,9 +46,7 @@ def _validate_headers(
     if not columns or all(
         pd.isna(column) or not str(column).strip() for column in columns
     ):
-        raise MissingHeaderError(
-            "The selected worksheet has no usable column headers."
-        )
+        raise MissingHeaderError("The selected worksheet has no usable column headers.")
 
     if len(columns) > max_columns:
         raise ColumnLimitError(
@@ -60,9 +56,7 @@ def _validate_headers(
     normalized = [str(column).strip() for column in columns]
 
     if any(not column for column in normalized):
-        raise MissingHeaderError(
-            "One or more worksheet headers are empty."
-        )
+        raise MissingHeaderError("One or more worksheet headers are empty.")
 
     if len(normalized) != len(set(normalized)):
         raise DuplicateHeaderError(
@@ -107,9 +101,7 @@ def read_excel_bytes(
     sheets = list_excel_sheets(data)
 
     if not sheets:
-        raise InvalidFileError(
-            "The Excel workbook does not contain any worksheets."
-        )
+        raise InvalidFileError("The Excel workbook does not contain any worksheets.")
 
     if sheet_name not in sheets:
         raise SheetSelectionError(
@@ -130,18 +122,13 @@ def read_excel_bytes(
             nrows=settings.max_rows + 1,
         )
     except (pd.errors.ParserError, UnicodeError, ValueError, KeyError) as exc:
-        raise InvalidFileError(
-            "The selected worksheet could not be parsed."
-        ) from exc
+        raise InvalidFileError("The selected worksheet could not be parsed.") from exc
     except Exception as exc:
-        raise InvalidFileError(
-            "The selected worksheet could not be read."
-        ) from exc
+        raise InvalidFileError("The selected worksheet could not be read.") from exc
 
     if len(dataframe) > settings.max_rows:
         raise RowLimitError(
-            f"The worksheet exceeds the limit of "
-            f"{settings.max_rows} data rows."
+            f"The worksheet exceeds the limit of {settings.max_rows} data rows."
         )
 
     if dataframe.empty:

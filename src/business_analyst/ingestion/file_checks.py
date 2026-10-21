@@ -1,4 +1,3 @@
-
 """Pre-parse checks for untrusted tabular uploads."""
 
 from __future__ import annotations
@@ -16,8 +15,7 @@ from business_analyst.exceptions import (
 )
 
 XLSX_CONTENT_TYPE = (
-    "application/vnd.openxmlformats-officedocument."
-    "spreadsheetml.sheet.main+xml"
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
 )
 
 XLSX_REQUIRED_MEMBERS = {
@@ -117,9 +115,7 @@ def validate_xlsx_signature(data: bytes) -> None:
             names = {item.filename for item in infos}
 
             if not XLSX_REQUIRED_MEMBERS.issubset(names):
-                raise InvalidFileError(
-                    "The file is not a valid Excel XLSX workbook."
-                )
+                raise InvalidFileError("The file is not a valid Excel XLSX workbook.")
 
             if len(infos) > 10_000:
                 raise InvalidFileError(
@@ -148,6 +144,4 @@ def validate_xlsx_signature(data: bytes) -> None:
             "The Excel workbook archive is damaged or malformed."
         ) from exc
     except OSError as exc:
-        raise InvalidFileError(
-            "The Excel workbook could not be inspected."
-        ) from exc
+        raise InvalidFileError("The Excel workbook could not be inspected.") from exc

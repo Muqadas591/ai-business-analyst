@@ -1,4 +1,3 @@
-
 """Tests for the synthetic retail data generator."""
 
 import pandas as pd
@@ -40,11 +39,7 @@ def test_generator_rejects_zero_rows() -> None:
 
 
 def test_csv_export_is_readable() -> None:
-    dataframe = pd.read_csv(
-        __import__(
-            "io"
-        ).BytesIO(retail_sales_csv_bytes(rows=5))
-    )
+    dataframe = pd.read_csv(__import__("io").BytesIO(retail_sales_csv_bytes(rows=5)))
 
     assert len(dataframe) == 5
 

@@ -1,4 +1,3 @@
-
 """Shared pytest fixtures."""
 
 from io import BytesIO
@@ -30,11 +29,7 @@ def test_settings() -> Settings:
 @pytest.fixture
 def csv_bytes() -> bytes:
     """Return a small, valid UTF-8 CSV dataset."""
-    return (
-        b"order_id,region,revenue\n"
-        b"ORD-001,North,100.0\n"
-        b"ORD-002,South,200.0\n"
-    )
+    return b"order_id,region,revenue\nORD-001,North,100.0\nORD-002,South,200.0\n"
 
 
 @pytest.fixture

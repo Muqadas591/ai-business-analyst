@@ -1,4 +1,3 @@
-
 """Typed data models returned by ingestion."""
 
 from dataclasses import dataclass

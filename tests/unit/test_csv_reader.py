@@ -1,4 +1,3 @@
-
 """Tests for CSV ingestion."""
 
 import pytest
@@ -68,10 +67,7 @@ def test_rejects_malformed_csv(test_settings) -> None:
 
 
 def test_rejects_excess_rows(test_settings) -> None:
-    payload = (
-        b"name,value\n"
-        b"A,1\nB,2\nC,3\nD,4\nE,5\nF,6\n"
-    )
+    payload = b"name,value\nA,1\nB,2\nC,3\nD,4\nE,5\nF,6\n"
 
     with pytest.raises(RowLimitError):
         read_csv_bytes(payload, test_settings)

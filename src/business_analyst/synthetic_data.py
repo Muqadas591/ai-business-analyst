@@ -1,4 +1,3 @@
-
 """Generate reproducible synthetic retail data for development and demos."""
 
 from __future__ import annotations
@@ -19,12 +18,8 @@ def generate_retail_sales(
 
     rng = np.random.default_rng(seed)
 
-    products = np.array(
-        ["Laptop", "Monitor", "Keyboard", "Mouse", "Headphones"]
-    )
-    regions = np.array(
-        ["North", "South", "East", "West", "Central"]
-    )
+    products = np.array(["Laptop", "Monitor", "Keyboard", "Mouse", "Headphones"])
+    regions = np.array(["North", "South", "East", "West", "Central"])
 
     product_prices = {
         "Laptop": 850.0,
@@ -58,12 +53,9 @@ def generate_retail_sales(
     cost = quantity * unit_price * cost_ratio
     profit = revenue - cost
 
-    dates = (
-        pd.Timestamp("2025-01-01")
-        + pd.to_timedelta(
-            rng.integers(0, 365, size=rows),
-            unit="D",
-        )
+    dates = pd.Timestamp("2025-01-01") + pd.to_timedelta(
+        rng.integers(0, 365, size=rows),
+        unit="D",
     )
 
     return pd.DataFrame(

@@ -1,4 +1,3 @@
-
 """Central application configuration."""
 
 from functools import lru_cache
@@ -19,9 +18,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "AI Business Analyst"
-    app_env: Literal["development", "test", "staging", "production"] = (
-        "development"
-    )
+    app_env: Literal["development", "test", "staging", "production"] = "development"
     app_debug: bool = False
     log_level: str = "INFO"
 

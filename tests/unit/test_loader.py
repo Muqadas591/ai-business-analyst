@@ -1,4 +1,3 @@
-
 """Tests for the public ingestion service."""
 
 import pytest

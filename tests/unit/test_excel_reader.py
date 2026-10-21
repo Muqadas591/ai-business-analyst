@@ -1,4 +1,3 @@
-
 """Tests for Excel ingestion."""
 
 import pytest
