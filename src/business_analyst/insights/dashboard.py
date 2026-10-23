@@ -18,6 +18,8 @@ def render_insight_dashboard(
     *,
     workspace_key: str = "insights",
 ) -> None:
+    """Render AI insights based on an existing Phase 4 analysis result."""
+
     st.header("AI-Powered Business Insights")
 
     if analysis is None:
@@ -47,19 +49,38 @@ def render_insight_dashboard(
         type="primary",
         key=f"{workspace_key}_generate",
     ):
+        # Reuse the previously generated report on Streamlit reruns.
+        existing_report = st.session_state.get(f"{workspace_key}_insight_report")
+
+        if existing_report is not None:
+            st.caption(
+                "A previously generated insights report is available "
+                "in this session. Click Generate AI insights to replace it."
+            )
         return
 
     try:
         settings = InsightSettings.from_env()
         settings.validate()
+
         report = InsightEngine(settings=settings).generate(
             analysis,
             business_context=business_context,
         )
-    except (ValueError, ProviderError, InsightValidationError) as exc:
+
+    except (
+        ValueError,
+        ProviderError,
+        InsightValidationError,
+    ) as exc:
         st.error(f"Insights could not be generated: {exc}")
         return
 
+    # Save the successfully generated, validated InsightReport object.
+    # Reporting dashboards can reuse this object without another LLM call.
+    st.session_state[f"{workspace_key}_insight_report"] = report
+
+    # Preserve the JSON representation for downloads and existing consumers.
     report_data = report.model_dump(mode="json")
     st.session_state[f"{workspace_key}_report"] = report_data
 
@@ -67,11 +88,15 @@ def render_insight_dashboard(
     st.write(report.executive_summary)
 
     st.subheader("Insights and recommendations")
+
     if not report.insights:
         st.info("The model did not return any validated insights.")
 
     for index, insight in enumerate(report.insights, start=1):
-        with st.expander(f"{index}. {insight.title}", expanded=index == 1):
+        with st.expander(
+            f"{index}. {insight.title}",
+            expanded=index == 1,
+        ):
             st.markdown("**What the evidence shows**")
             st.write(insight.observation)
 
@@ -105,7 +130,11 @@ def render_insight_dashboard(
 
     st.download_button(
         "Download validated insights (JSON)",
-        data=json.dumps(report_data, indent=2, ensure_ascii=False),
+        data=json.dumps(
+            report_data,
+            indent=2,
+            ensure_ascii=False,
+        ),
         file_name="ai_business_insights.json",
         mime="application/json",
         key=f"{workspace_key}_download",

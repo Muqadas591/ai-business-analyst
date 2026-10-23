@@ -10,10 +10,12 @@ from business_analyst.cleaning.dashboard import render_cleaning_dashboard
 from business_analyst.config import get_settings
 from business_analyst.exceptions import IngestionError
 from business_analyst.ingestion import DataIngestionService
+from business_analyst.insights.dashboard import render_insight_dashboard
 from business_analyst.quality.dashboard import render_quality_dashboard
 from business_analyst.quality.rules import QualityRules
+from business_analyst.reporting.dashboard import render_reporting_dashboard
 from business_analyst.synthetic_data import retail_sales_csv_bytes
-from business_analyst.insights.dashboard import render_insight_dashboard
+
 
 # ---------------------------------------------------------
 # Application configuration
@@ -30,7 +32,8 @@ ingestion_service = DataIngestionService(settings)
 
 st.title("AI Business Analyst")
 st.caption(
-    "Upload CSV or Excel data to explore data quality, cleaning, and business analysis."
+    "Upload CSV or Excel data to explore data quality, cleaning, "
+    "business analysis, AI insights, and reporting."
 )
 
 
@@ -64,13 +67,20 @@ if st.button("Load synthetic retail demo"):
     st.session_state["demo_filename"] = "synthetic_retail_sales.csv"
     st.session_state.pop("ingestion_result", None)
 
-    # Clear cleaning state when starting with a new dataset.
-    for key in (
+    # Clear all downstream results for the new dataset.
+    keys_to_clear = (
         "uploaded_dataset_original",
         "uploaded_dataset_cleaned",
         "uploaded_dataset_audit",
         "uploaded_dataset_cleaning_plan",
-    ):
+        "uploaded_dataset_analysis_result",
+        "uploaded_dataset_insights_analysis_result",
+        "uploaded_dataset_insights_insight_report",
+        "uploaded_dataset_insights_report",
+        "uploaded_dataset_report",
+    )
+
+    for key in keys_to_clear:
         st.session_state.pop(key, None)
 
 
@@ -117,13 +127,20 @@ if file_bytes is not None and filename is not None:
 
             st.session_state["ingestion_result"] = result
 
-            # Reset cleaning state for the newly ingested dataset.
-            for key in (
+            # Reset all downstream state for the newly loaded dataset.
+            keys_to_clear = (
                 "uploaded_dataset_original",
                 "uploaded_dataset_cleaned",
                 "uploaded_dataset_audit",
                 "uploaded_dataset_cleaning_plan",
-            ):
+                "uploaded_dataset_analysis_result",
+                "uploaded_dataset_insights_analysis_result",
+                "uploaded_dataset_insights_insight_report",
+                "uploaded_dataset_insights_report",
+                "uploaded_dataset_report",
+            )
+
+            for key in keys_to_clear:
                 st.session_state.pop(key, None)
 
             st.success("Dataset loaded successfully.")
@@ -138,7 +155,7 @@ if file_bytes is not None and filename is not None:
 
 
 # ---------------------------------------------------------
-# Dataset overview and preview
+# Retrieve ingested dataset
 # ---------------------------------------------------------
 
 result = st.session_state.get("ingestion_result")
@@ -150,8 +167,12 @@ if result is None:
     )
     st.stop()
 
-
 dataframe = result.dataframe
+
+
+# ---------------------------------------------------------
+# Phase 1: Dataset overview and preview
+# ---------------------------------------------------------
 
 st.subheader("2. Dataset overview")
 
@@ -186,20 +207,18 @@ st.dataframe(
 
 
 # ---------------------------------------------------------
-# Data quality dashboard
+# Phase 2: Data quality
 # ---------------------------------------------------------
 
 st.subheader("4. Data quality")
 
-rules = QualityRules(
-    max_missing_fraction=0.05,
-)
+rules = QualityRules(max_missing_fraction=0.05)
 
 render_quality_dashboard(dataframe, rules)
 
 
 # ---------------------------------------------------------
-# Data cleaning dashboard
+# Phase 3: Data cleaning
 # ---------------------------------------------------------
 
 st.subheader("5. Data cleaning")
@@ -211,15 +230,15 @@ render_cleaning_dashboard(
 
 
 # ---------------------------------------------------------
-# Retrieve the latest cleaning workspace state
+# Retrieve cleaning workspace state
 # ---------------------------------------------------------
 
-cleaning_original = st.session_state.get(
+original_dataframe = st.session_state.get(
     "uploaded_dataset_original",
     dataframe,
 )
 
-cleaning_result = st.session_state.get(
+cleaned_dataframe = st.session_state.get(
     "uploaded_dataset_cleaned",
     dataframe,
 )
@@ -228,54 +247,76 @@ cleaning_audit = st.session_state.get(
     "uploaded_dataset_audit",
     [],
 )
-analysis_result = st.session_state.get("uploaded_dataset_analysis_result")
+
 
 # ---------------------------------------------------------
 # Compare data quality before and after cleaning
 # ---------------------------------------------------------
 
-quality_comparison_dict: dict = {}
+quality_comparison = None
 
 try:
-    quality_comparison = compare_quality(
-        cleaning_original,
-        cleaning_result,
+    comparison_result = compare_quality(
+        original_dataframe,
+        cleaned_dataframe,
     )
 
-    quality_comparison_dict = vars(quality_comparison)
+    quality_comparison = vars(comparison_result)
 
 except (TypeError, ValueError, KeyError):
-    # Keep the analysis dashboard available if comparison
-    # data cannot be generated.
-    quality_comparison_dict = {}
+    quality_comparison = None
 
 
 # ---------------------------------------------------------
-# Business analysis dashboard
+# Phase 4: Business analysis
 # ---------------------------------------------------------
 
 st.subheader("6. Business analysis")
 
 render_analysis_dashboard(
-    cleaning_result,
-    original_dataframe=cleaning_original,
+    cleaned_dataframe,
+    original_dataframe=original_dataframe,
     audit_trail=cleaning_audit,
-    quality_comparison=quality_comparison_dict,
+    quality_comparison=quality_comparison or {},
     workspace_key="uploaded_dataset",
 )
 
+# Retrieve the latest successful Phase 4 result AFTER the
+# dashboard renders, because analysis runs from its own button.
+analysis_result = st.session_state.get("uploaded_dataset_analysis_result")
+
+
 # ---------------------------------------------------------
-# AI insights dashboard
+# Phase 5: AI insights
 # ---------------------------------------------------------
 
 st.subheader("7. AI insights")
 
-analysis_result = st.session_state.get("uploaded_dataset_analysis_result")
-
 if analysis_result is not None:
     render_insight_dashboard(
-        analysis_result=analysis_result,
-        workspace_key="uploaded_dataset",
+        analysis_result,
+        workspace_key="uploaded_dataset_insights",
     )
 else:
     st.info("Run the business analysis first to generate AI insights.")
+
+# Retrieve the saved Phase 5 report after its dashboard renders.
+insight_report = st.session_state.get("uploaded_dataset_insights_insight_report")
+
+
+# ---------------------------------------------------------
+# Phase 6: Reporting dashboard
+# ---------------------------------------------------------
+
+st.subheader("8. Reports")
+
+render_reporting_dashboard(
+    original_dataframe=original_dataframe,
+    cleaned_dataframe=cleaned_dataframe,
+    quality_report=None,
+    quality_comparison=quality_comparison,
+    cleaning_audit=cleaning_audit,
+    analysis_result=analysis_result,
+    insight_report=insight_report,
+    workspace_key="uploaded_dataset",
+)
