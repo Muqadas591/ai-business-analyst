@@ -13,7 +13,7 @@ from business_analyst.ingestion import DataIngestionService
 from business_analyst.quality.dashboard import render_quality_dashboard
 from business_analyst.quality.rules import QualityRules
 from business_analyst.synthetic_data import retail_sales_csv_bytes
-
+from business_analyst.insights.dashboard import render_insight_dashboard
 
 # ---------------------------------------------------------
 # Application configuration
@@ -228,7 +228,7 @@ cleaning_audit = st.session_state.get(
     "uploaded_dataset_audit",
     [],
 )
-
+analysis_result = st.session_state.get("uploaded_dataset_analysis_result")
 
 # ---------------------------------------------------------
 # Compare data quality before and after cleaning
@@ -263,3 +263,19 @@ render_analysis_dashboard(
     quality_comparison=quality_comparison_dict,
     workspace_key="uploaded_dataset",
 )
+
+# ---------------------------------------------------------
+# AI insights dashboard
+# ---------------------------------------------------------
+
+st.subheader("7. AI insights")
+
+analysis_result = st.session_state.get("uploaded_dataset_analysis_result")
+
+if analysis_result is not None:
+    render_insight_dashboard(
+        analysis_result=analysis_result,
+        workspace_key="uploaded_dataset",
+    )
+else:
+    st.info("Run the business analysis first to generate AI insights.")

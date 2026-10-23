@@ -280,9 +280,9 @@ def render_analysis_dashboard(
         "A fingerprint identifies the current DataFrame representation."
     )
     st.json(result.lineage)
-
+    st.session_state[f"{workspace_key}_analysis_result"] = result
     st.download_button(
-        "Download analysis results (JSON)",
+        "Downl oad analysis results (JSON)",
         data=__import__("json").dumps(result.to_dict(), indent=2, default=str),
         file_name="business_analysis.json",
         mime="application/json",
