@@ -48,7 +48,7 @@ from business_analyst.workspaces.access import (
     WorkspacePermissionError,
 )
 from business_analyst.workspaces.models import WorkspaceRole
-
+from business_analyst.product_dashboard import render_product_overview
 configure_logging()
 logger = logging.getLogger(__name__)
 
@@ -480,7 +480,13 @@ ingestion_result = st.session_state.get(
     f"{WORKSPACE_KEY}_ingestion_result"
 )
 
+# Show the product overview even when no dataset has been loaded.
 if ingestion_result is None:
+    render_product_overview(
+        dataframe=None,
+        workspace_name=workspace.name,
+    )
+
     st.info(
         "Upload a CSV or Excel file, or load the synthetic demo, "
         "then click 'Load dataset' to continue."
@@ -496,6 +502,47 @@ except ValueError as exc:
     st.error(f"The stored dataset failed validation: {exc}")
     stop_app()
 
+
+# ---------------------------------------------------------
+# 5A. Product overview
+# ---------------------------------------------------------
+
+original_for_overview = st.session_state.get(
+    f"{WORKSPACE_KEY}_original",
+    dataframe,
+)
+
+cleaned_for_overview = st.session_state.get(
+    f"{WORKSPACE_KEY}_cleaned",
+    dataframe,
+)
+
+analysis_for_overview = st.session_state.get(
+    f"{WORKSPACE_KEY}_analysis_result"
+)
+
+insights_for_overview = st.session_state.get(
+    f"{INSIGHTS_KEY}_insight_report"
+)
+
+reports_for_overview = st.session_state.get(
+    f"{WORKSPACE_KEY}_report_artifacts"
+)
+
+is_synthetic_demo = (
+    f"{WORKSPACE_KEY}_demo_file" in st.session_state
+)
+
+render_product_overview(
+    dataframe=dataframe,
+    workspace_name=workspace.name,
+    original_dataframe=original_for_overview,
+    cleaned_dataframe=cleaned_for_overview,
+    analysis_result=analysis_for_overview,
+    insight_report=insights_for_overview,
+    report_artifacts=reports_for_overview,
+    is_synthetic_demo=is_synthetic_demo,
+)
 
 # ---------------------------------------------------------
 # 6. Dataset overview and permitted reads

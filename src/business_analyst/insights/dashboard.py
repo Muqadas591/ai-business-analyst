@@ -1,7 +1,7 @@
 """Streamlit interface for AI-generated business insights."""
 
 from __future__ import annotations
-
+import logging
 import json
 
 import streamlit as st
@@ -11,7 +11,7 @@ from business_analyst.insights.config import InsightSettings
 from business_analyst.insights.engine import InsightEngine
 from business_analyst.insights.providers import ProviderError
 from business_analyst.insights.validation import InsightValidationError
-
+logger = logging.getLogger(__name__)
 
 def render_insight_dashboard(
     analysis: AnalysisResult | None,
@@ -69,12 +69,26 @@ def render_insight_dashboard(
         )
 
     except (
-        ValueError,
-        ProviderError,
-        InsightValidationError,
-    ) as exc:
-        st.error(f"Insights could not be generated: {exc}")
-        return
+    ValueError,
+    ProviderError,
+    InsightValidationError,
+) as exc:
+    # Log the exception category without exposing its message, which
+    # could contain provider diagnostics or sensitive request details.
+        logger.warning(
+        "AI insight generation failed.",
+        extra={
+            "event": "ai_insight_generation_failed",
+            "error_type": type(exc).__name__,
+        },
+    )
+
+    st.error(
+        "AI insights could not be generated. The provider may be "
+        "unavailable, or the response may not have passed validation. "
+        "Please try again."
+    )
+    return
 
     # Save the successfully generated, validated InsightReport object.
     # Reporting dashboards can reuse this object without another LLM call.
