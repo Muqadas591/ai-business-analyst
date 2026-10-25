@@ -8,7 +8,9 @@ import logging
 
 import pandas as pd
 import streamlit as st
-
+from business_analyst.auth_ui import (
+    render_authentication_and_workspace_selector,
+)
 from business_analyst.analysis.dashboard import render_analysis_dashboard
 from business_analyst.cleaning.comparison import compare_quality
 from business_analyst.cleaning.dashboard import render_cleaning_dashboard
@@ -16,7 +18,7 @@ from business_analyst.config import get_settings
 from business_analyst.exceptions import IngestionError
 from business_analyst.ingestion import DataIngestionService
 from business_analyst.insights.dashboard import render_insight_dashboard
-from business_analyst.observability.logging_config import (
+from business_analyst.security.logging_config import (
     configure_logging,
     log_security_event,
 )
@@ -63,49 +65,34 @@ ingestion_service = DataIngestionService(settings)
 # ---------------------------------------------------------
 # 1. Authentication and workspace authorization
 # ---------------------------------------------------------
-
-# Authentication middleware must provide this context using a real,
-# verified authentication provider. Never accept a user ID from a text input.
-_auth_context = st.session_state.get("_workspace_auth_context")
-
-if not isinstance(_auth_context, dict):
-    st.error(
-        "Authenticated workspace context is not configured. Connect your "
-        "real authentication middleware and workspace selector before "
-        "using this app."
-    )
-    st.stop()
-
-principal = _auth_context.get("verified_user")
-db_session = _auth_context.get("db_session")
-selected_workspace_id = _auth_context.get("selected_workspace_id")
-
-if principal is None or db_session is None or not selected_workspace_id:
-    st.error(
-        "The authentication context must provide a verified principal, "
-        "database session, and selected workspace ID. No workspace data "
-        "was loaded."
-    )
-    st.stop()
+_auth_context = render_authentication_and_workspace_selector()
+principal = _auth_context["verified_user"]
+db_session = _auth_context["db_session"]
+selected_workspace_id = _auth_context["selected_workspace_id"]
 
 try:
-    # Keep identity verification separate from workspace authorization.
+    # The principal comes from successful application authentication.
     authenticated_user_id = require_authenticated_user_id(principal)
-
     access = WorkspaceAccessService(db_session)
 
-    # Verify active membership before loading workspace-specific data.
+    # Verify membership before loading workspace-specific data.
     workspace = access.get_accessible_workspace(
         authenticated_user_id=authenticated_user_id,
         workspace_id=selected_workspace_id,
     )
-
 except Exception:
+    db_session.close()
     logger.warning(
         "Workspace access verification failed.",
         extra={"event": "workspace_access_denied"},
     )
     st.error("The selected workspace could not be verified or accessed.")
+    st.stop()
+
+
+def stop_app() -> None:
+    """Close the database session before stopping the Streamlit run."""
+    db_session.close()
     st.stop()
 
 
@@ -143,7 +130,9 @@ def require_owner_access() -> None:
     )
 
 
-can_edit = has_any_role({WorkspaceRole.OWNER, WorkspaceRole.EDITOR})
+can_edit = has_any_role(
+    {WorkspaceRole.OWNER, WorkspaceRole.EDITOR}
+)
 is_owner = has_any_role({WorkspaceRole.OWNER})
 
 workspace_key = workspace_namespace(
@@ -160,9 +149,14 @@ INSIGHTS_KEY = f"{workspace_key}_insights"
 # ---------------------------------------------------------
 
 # Clear artifacts belonging to the previous workspace namespace.
-_previous_workspace_key = st.session_state.get("_active_workspace_namespace")
+_previous_workspace_key = st.session_state.get(
+    "_active_workspace_namespace"
+)
 
-if _previous_workspace_key and _previous_workspace_key != workspace_key:
+if (
+    _previous_workspace_key
+    and _previous_workspace_key != workspace_key
+):
     for state_key in list(st.session_state.keys()):
         if state_key.startswith(_previous_workspace_key):
             st.session_state.pop(state_key, None)
@@ -265,7 +259,9 @@ with st.sidebar:
         "and database membership checks. Dashboard artifacts use a "
         "user/workspace-specific namespace."
     )
-    st.caption(f"Maximum upload size: {settings.max_upload_size_mb} MB")
+    st.caption(
+        f"Maximum upload size: {settings.max_upload_size_mb} MB"
+    )
 
     if is_owner:
         st.caption("Workspace role: Owner")
@@ -310,24 +306,30 @@ with demo_column:
             require_editor_access()
 
             demo_bytes = retail_sales_csv_bytes()
-            demo_filename = validate_filename("synthetic_retail_sales.csv")
+            demo_filename = validate_filename(
+                "synthetic_retail_sales.csv"
+            )
             validate_upload_size(len(demo_bytes))
 
             # Clear stale results when replacing the current dataset.
             clear_dataset_state()
 
-            st.session_state[f"{WORKSPACE_KEY}_demo_file"] = demo_bytes
+            st.session_state[
+                f"{WORKSPACE_KEY}_demo_file"
+            ] = demo_bytes
 
-            st.session_state[f"{WORKSPACE_KEY}_demo_filename"] = demo_filename
+            st.session_state[
+                f"{WORKSPACE_KEY}_demo_filename"
+            ] = demo_filename
 
             st.rerun()
 
         except WorkspacePermissionError:
             st.error("Owner or editor permission is required.")
-            st.stop()
+            stop_app()
         except (ValueError, ResourceLimitError) as exc:
             reject_upload(str(exc))
-            st.stop()
+            stop_app()
 
 with reset_column:
     if st.button(
@@ -341,7 +343,7 @@ with reset_column:
             st.rerun()
         except WorkspacePermissionError:
             st.error("Only the workspace owner can reset this workspace.")
-            st.stop()
+            stop_app()
 
 
 # Validate a user-uploaded file before reading its bytes or parsing a workbook.
@@ -356,10 +358,10 @@ if uploaded_file is not None and can_edit:
 
     except WorkspacePermissionError:
         st.error("Owner or editor permission is required.")
-        st.stop()
+        stop_app()
     except (ValueError, ResourceLimitError) as exc:
         reject_upload(str(exc))
-        st.stop()
+        stop_app()
 
 
 file_bytes: bytes | None = None
@@ -372,7 +374,9 @@ if uploaded_file is not None and can_edit:
 
 elif f"{WORKSPACE_KEY}_demo_file" in st.session_state:
     file_bytes = st.session_state[f"{WORKSPACE_KEY}_demo_file"]
-    filename = st.session_state.get(f"{WORKSPACE_KEY}_demo_filename")
+    filename = st.session_state.get(
+        f"{WORKSPACE_KEY}_demo_filename"
+    )
 
 
 if file_bytes is not None and filename is not None and can_edit:
@@ -392,7 +396,7 @@ if file_bytes is not None and filename is not None and can_edit:
 
             if not sheets:
                 st.error("This workbook does not contain any worksheets.")
-                st.stop()
+                stop_app()
 
             selected_sheet = st.selectbox(
                 "Select worksheet",
@@ -421,12 +425,16 @@ if file_bytes is not None and filename is not None and can_edit:
                     )
 
                 # Enforce row/column limits before profiling or analysis.
-                validate_dataframe_size(ingestion_result.dataframe)
+                validate_dataframe_size(
+                    ingestion_result.dataframe
+                )
 
                 # The new dataset was accepted; invalidate dependent results.
                 clear_dataset_state()
 
-                st.session_state[f"{WORKSPACE_KEY}_ingestion_result"] = ingestion_result
+                st.session_state[
+                    f"{WORKSPACE_KEY}_ingestion_result"
+                ] = ingestion_result
 
                 st.session_state["workflow_state"] = WorkflowState(
                     dataset_id=WORKSPACE_KEY
@@ -437,10 +445,10 @@ if file_bytes is not None and filename is not None and can_edit:
 
             except WorkspacePermissionError:
                 st.error("Owner or editor permission is required.")
-                st.stop()
+                stop_app()
             except (ValueError, ResourceLimitError) as exc:
                 reject_upload(str(exc))
-                st.stop()
+                stop_app()
 
     except IngestionError as exc:
         st.error(exc.message)
@@ -448,7 +456,10 @@ if file_bytes is not None and filename is not None and can_edit:
         reject_upload(str(exc))
     except Exception:
         logger.exception("Dataset ingestion failed.")
-        st.error("The file could not be loaded. Check the format and try again.")
+        st.error(
+            "The file could not be loaded. Check the format and "
+            "try again."
+        )
 
 
 # ---------------------------------------------------------
@@ -463,16 +474,18 @@ try:
     )
 except Exception:
     st.error("Workspace access could not be verified.")
-    st.stop()
+    stop_app()
 
-ingestion_result = st.session_state.get(f"{WORKSPACE_KEY}_ingestion_result")
+ingestion_result = st.session_state.get(
+    f"{WORKSPACE_KEY}_ingestion_result"
+)
 
 if ingestion_result is None:
     st.info(
         "Upload a CSV or Excel file, or load the synthetic demo, "
         "then click 'Load dataset' to continue."
     )
-    st.stop()
+    stop_app()
 
 dataframe = ingestion_result.dataframe
 
@@ -481,7 +494,7 @@ try:
 except ValueError as exc:
     clear_dataset_state()
     st.error(f"The stored dataset failed validation: {exc}")
-    st.stop()
+    stop_app()
 
 
 # ---------------------------------------------------------
@@ -549,7 +562,8 @@ if can_edit:
 
     except WorkspacePermissionError:
         st.warning(
-            "Cleaning is unavailable because owner or editor permission is required."
+            "Cleaning is unavailable because owner or editor "
+            "permission is required."
         )
 else:
     st.info(
@@ -578,15 +592,20 @@ try:
     validate_dataframe_size(cleaned_dataframe)
 except ValueError as exc:
     st.error(f"Dataset validation failed: {exc}")
-    st.stop()
+    stop_app()
 
 
 # Invalidate downstream results if the cleaned data changed.
 current_fingerprint = dataframe_fingerprint(cleaned_dataframe)
 
-previous_fingerprint = st.session_state.get(f"{WORKSPACE_KEY}_cleaned_fingerprint")
+previous_fingerprint = st.session_state.get(
+    f"{WORKSPACE_KEY}_cleaned_fingerprint"
+)
 
-if previous_fingerprint is not None and previous_fingerprint != current_fingerprint:
+if (
+    previous_fingerprint is not None
+    and previous_fingerprint != current_fingerprint
+):
     invalidate_session_results(
         st.session_state,
         WorkflowStage.ANALYSIS,
@@ -609,7 +628,9 @@ if previous_fingerprint is not None and previous_fingerprint != current_fingerpr
         "and generated reports were cleared. Run the downstream stages again."
     )
 
-st.session_state[f"{WORKSPACE_KEY}_cleaned_fingerprint"] = current_fingerprint
+st.session_state[
+    f"{WORKSPACE_KEY}_cleaned_fingerprint"
+] = current_fingerprint
 
 
 # ---------------------------------------------------------
@@ -639,7 +660,9 @@ except (TypeError, ValueError, KeyError):
 
 st.subheader("6. Business analysis")
 
-analysis_result = st.session_state.get(f"{WORKSPACE_KEY}_analysis_result")
+analysis_result = st.session_state.get(
+    f"{WORKSPACE_KEY}_analysis_result"
+)
 
 if can_edit:
     try:
@@ -658,7 +681,9 @@ if can_edit:
         st.warning("Owner or editor permission is required for analysis.")
 
     # Re-read the result in case the dashboard generated it.
-    analysis_result = st.session_state.get(f"{WORKSPACE_KEY}_analysis_result")
+    analysis_result = st.session_state.get(
+        f"{WORKSPACE_KEY}_analysis_result"
+    )
 
 else:
     st.info(
@@ -691,9 +716,14 @@ elif analysis_result is None:
     st.info("Run business analysis before generating AI insights.")
 
 else:
-    st.info("Insight generation and regeneration are restricted to owners and editors.")
+    st.info(
+        "Insight generation and regeneration are restricted to owners "
+        "and editors."
+    )
 
-insight_report = st.session_state.get(f"{INSIGHTS_KEY}_insight_report")
+insight_report = st.session_state.get(
+    f"{INSIGHTS_KEY}_insight_report"
+)
 
 
 # ---------------------------------------------------------
@@ -731,7 +761,9 @@ except Exception:
         "or report validation failed."
     )
 
-report_artifacts = st.session_state.get(f"{WORKSPACE_KEY}_report_artifacts")
+report_artifacts = st.session_state.get(
+    f"{WORKSPACE_KEY}_report_artifacts"
+)
 
 
 # ---------------------------------------------------------
@@ -777,3 +809,6 @@ for row in status_rows:
 
 with st.expander("Workflow state (diagnostics)"):
     st.json(workflow_state.to_dict())
+
+# Close the workspace database session after normal dashboard completion.
+db_session.close()

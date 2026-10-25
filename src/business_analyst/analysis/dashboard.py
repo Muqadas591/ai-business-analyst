@@ -124,35 +124,42 @@ def render_analysis_dashboard(
             key=f"{workspace_key}_aggregation",
         )
 
-    if not st.button(
+    run_analysis = st.button(
         "Run analysis",
         type="primary",
         key=f"{workspace_key}_run",
-    ):
-        st.caption("Configure the columns above and run the analysis.")
-        return
+    )
+    result_key = f"{workspace_key}_analysis_result"
 
-    try:
-        result = AnalysisEngine().run(
-            dataframe,
-            dataset_id=workspace_key,
-            revenue_column=revenue_column,
-            profit_column=profit_column,
-            order_id_column=order_id_column,
-            quantity_column=quantity_column,
-            date_column=date_column,
-            trend_metric_column=trend_metric_column,
-            trend_frequency=frequency,
-            group_column=group_column,
-            group_metric_column=group_metric_column,
-            group_aggregation=aggregation,
-            original_dataframe=original_dataframe,
-            audit_trail=audit_trail,
-            quality_comparison=quality_comparison,
-        )
-    except (TypeError, ValueError) as exc:
-        st.error(f"Analysis could not be completed: {exc}")
-        return
+    if run_analysis:
+        try:
+            result = AnalysisEngine().run(
+                dataframe,
+                dataset_id=workspace_key,
+                revenue_column=revenue_column,
+                profit_column=profit_column,
+                order_id_column=order_id_column,
+                quantity_column=quantity_column,
+                date_column=date_column,
+                trend_metric_column=trend_metric_column,
+                trend_frequency=frequency,
+                group_column=group_column,
+                group_metric_column=group_metric_column,
+                group_aggregation=aggregation,
+                original_dataframe=original_dataframe,
+                audit_trail=audit_trail,
+                quality_comparison=quality_comparison,
+            )
+        except (TypeError, ValueError) as exc:
+            st.error(f"Analysis could not be completed: {exc}")
+            return
+        st.session_state[result_key] = result
+    else:
+        result = st.session_state.get(result_key)
+        if result is None:
+            st.caption("Configure the columns above and run the analysis.")
+            return
+        st.caption("Showing the latest saved analysis result.")
 
     st.subheader("Dataset overview")
     m1, m2 = st.columns(2)

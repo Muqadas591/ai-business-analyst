@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     database_url: str = Field(
-        default="sqlite:///./business_analyst.db",
+        default="postgresql+psycopg://postgres:postgres@localhost:5432/ai_business_analyst",
         repr=False,
     )
 
