@@ -536,12 +536,6 @@ is_synthetic_demo = (
 render_product_overview(
     dataframe=dataframe,
     workspace_name=workspace.name,
-    original_dataframe=original_for_overview,
-    cleaned_dataframe=cleaned_for_overview,
-    analysis_result=analysis_for_overview,
-    insight_report=insights_for_overview,
-    report_artifacts=reports_for_overview,
-    is_synthetic_demo=is_synthetic_demo,
 )
 
 # ---------------------------------------------------------
