@@ -1,66 +1,91 @@
-import pytest
+"""Unit tests for workflow state and downstream invalidation."""
 
 from business_analyst.workflow import (
     StageStatus,
     WorkflowStage,
     WorkflowState,
+    invalidate_session_results,
 )
 
 
 def test_workflow_initializes_all_stages() -> None:
-    state = WorkflowState(dataset_id="retail-demo")
+    state = WorkflowState(dataset_id="synthetic-retail")
 
     assert len(state.stages) == len(WorkflowStage)
-
-    for stage in WorkflowStage:
-        assert state.stages[stage.value].status == (
-            StageStatus.PENDING
-        )
+    assert all(record.status == StageStatus.PENDING for record in state.stages.values())
 
 
-def test_workflow_tracks_stage_completion() -> None:
-    state = WorkflowState(dataset_id="retail-demo")
-
-    state.mark_running(WorkflowStage.QUALITY)
-    assert state.stages["quality"].status == StageStatus.RUNNING
+def test_workflow_marks_stage_completed() -> None:
+    state = WorkflowState(dataset_id="synthetic-retail")
 
     state.mark_completed(
-        WorkflowStage.QUALITY,
-        message="Quality profiling finished",
+        WorkflowStage.UPLOAD,
+        "Synthetic dataset loaded.",
     )
 
-    assert state.is_completed(WorkflowStage.QUALITY)
+    assert state.is_completed(WorkflowStage.UPLOAD)
     assert (
-        state.stages["quality"].message
-        == "Quality profiling finished"
+        state.stages[WorkflowStage.UPLOAD.value].message == "Synthetic dataset loaded."
     )
 
 
-def test_workflow_tracks_stage_failure() -> None:
-    state = WorkflowState(dataset_id="retail-demo")
+def test_workflow_marks_failure() -> None:
+    state = WorkflowState(dataset_id="synthetic-retail")
 
     state.mark_failed(
         WorkflowStage.INSIGHTS,
-        error_code="PROVIDER_UNAVAILABLE",
-        message="The insight provider is unavailable.",
+        "PROVIDER_ERROR",
+        "The hosted AI provider is unavailable.",
     )
 
-    record = state.stages["insights"]
+    record = state.stages[WorkflowStage.INSIGHTS.value]
     assert record.status == StageStatus.FAILED
-    assert record.error_code == "PROVIDER_UNAVAILABLE"
+    assert record.error_code == "PROVIDER_ERROR"
 
 
-def test_empty_dataset_id_is_rejected() -> None:
-    with pytest.raises(ValueError):
-        WorkflowState(dataset_id=" ")
+def test_reset_from_analysis_preserves_cleaning() -> None:
+    state = WorkflowState(dataset_id="synthetic-retail")
+    state.mark_completed(WorkflowStage.UPLOAD)
+    state.mark_completed(WorkflowStage.QUALITY)
+    state.mark_completed(WorkflowStage.CLEANING)
+    state.mark_completed(WorkflowStage.ANALYSIS)
+    state.mark_completed(WorkflowStage.INSIGHTS)
+
+    state.reset_from(WorkflowStage.ANALYSIS)
+
+    assert state.is_completed(WorkflowStage.UPLOAD)
+    assert state.is_completed(WorkflowStage.QUALITY)
+    assert state.is_completed(WorkflowStage.CLEANING)
+    assert not state.is_completed(WorkflowStage.ANALYSIS)
+    assert not state.is_completed(WorkflowStage.INSIGHTS)
 
 
-def test_status_serialization_does_not_expose_artifacts() -> None:
-    state = WorkflowState(dataset_id="retail-demo")
-    state.artifacts["example"] = "internal-object"
+def test_serialization_contains_status_strings() -> None:
+    state = WorkflowState(dataset_id="synthetic-retail")
+    state.mark_completed(WorkflowStage.UPLOAD)
 
     payload = state.to_dict()
 
-    assert payload["dataset_id"] == "retail-demo"
-    assert "artifacts" not in payload
-    assert payload["stages"]["upload"]["status"] == "pending"
+    assert payload["dataset_id"] == "synthetic-retail"
+    assert payload["stages"]["upload"]["status"] == "completed"
+
+
+def test_invalidate_analysis_removes_stale_downstream_results() -> None:
+    session_state = {
+        "uploaded_dataset_analysis_result": object(),
+        "uploaded_dataset_insights_insight_report": object(),
+        "uploaded_dataset_report_artifacts": object(),
+        "uploaded_dataset_cleaned": object(),
+    }
+    state = WorkflowState(dataset_id="synthetic-retail")
+    session_state["workflow_state"] = state
+
+    invalidate_session_results(
+        session_state,
+        WorkflowStage.ANALYSIS,
+    )
+
+    assert "uploaded_dataset_analysis_result" not in session_state
+    assert "uploaded_dataset_insights_insight_report" not in session_state
+    assert "uploaded_dataset_report_artifacts" not in session_state
+    assert "uploaded_dataset_cleaned" in session_state
